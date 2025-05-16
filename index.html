@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="author" content="ChatGPT (OpenAI) mit einem Input von JR.">        
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image/png" href="favicon.ico">
+  <title>Passphrasen Generator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      background: #1e1e2f;
+      color: #f0f0f0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 420px;
+      width: 100%;
+      background: #2c2c3c;
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    #lengthValue {
+      font-weight: bold;
+      margin-left: 0.5rem;
+      color: #0af;
+    }
+    input[type="range"] {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      transition: transform 0.1s ease, background-color 0.3s;
+    }
+    button:hover {
+      background-color: #005fa3;
+      transform: scale(1.02);
+    }
+    .output {
+      font-weight: bold;
+      margin-top: 1rem;
+      word-break: break-word;
+      text-align: center;
+      font-size: 1.25rem;
+      background: #111;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
+      user-select: all;
+    }
+    .entropy {
+      text-align: center;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      color: #aaa;
+      line-height: 1.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Passphrasen Generator</h1>
+    <label for="length">Min. Zeichenlänge: <span id="lengthValue">20</span></label>
+    <input type="range" id="length" min="12" max="60" value="20" oninput="document.getElementById('lengthValue').textContent = this.value" />
+    <button onclick="generatePassphrase()">Generieren</button>
+    <button onclick="copyToClipboard()">Kopieren</button>
+    <div class="output" id="output"></div>
+    <div class="entropy" id="entropy"></div>
+  </div>
+  
+  <p style="margin-top: 60%">Diese Seite speichert keine Daten 🍪🚫, <br>betreibt kein Tracking. Vergewissere dich im <a href="https://github.com/honest-entropy/honest-entropie.github.io">Code auf Github</a>.</p>
+  
+
+  <script>
+    let wordList = [];
+    const specialChars = ['!', '@', '#', '$', '%', '&', '*', '?', '=', '-', '_'];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetch('https://raw.githubusercontent.com/bjoernalbers/diceware-wordlist-german/main/wordlist-german-diceware.txt')
+        .then(response => response.text())
+        .then(data => {
+          wordList = data
+            .split(/\r?\n/)
+            .map(line => line.trim().split(/\s+/).slice(1).join(' '))
+            .filter(Boolean);
+        })
+        .catch(err => {
+          alert('Fehler beim Laden der Wortliste: ' + err);
+        });
+    });
+
+    function capitalizeWordStart(word) {
+      if (Math.random() < 0.5) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      return word;
+    }
+
+    function getRandomSpecials(count = 1) {
+      let specials = '';
+      for (let i = 0; i < count; i++) {
+        specials += specialChars[Math.floor(Math.random() * specialChars.length)];
+      }
+      return specials;
+    }
+
+    function log2Factorial(n) {
+      if (n <= 1) return 0;
+      return n * Math.log2(n) - n * Math.log2(Math.E) + 0.5 * Math.log2(2 * Math.PI * n);
+    }
+
+    function log2Choose(n, k) {
+      if (k > n) return 0;
+      return log2Factorial(n) - log2Factorial(k) - log2Factorial(n - k);
+    }
+
+    function calculateEntropy(wordsUsed, specialsUsed) {
+      const wordEntropy = Math.log2(wordList.length);
+      const specialEntropy = Math.log2(specialChars.length);
+      const totalTokens = wordsUsed + specialsUsed;
+      const positionEntropy = log2Choose(totalTokens, specialsUsed);
+      return (wordsUsed * wordEntropy) + (specialsUsed * specialEntropy) + positionEntropy;
+    }
+
+    function calculateEntropyClassic(passphrase) {
+      const lettersLower = 26;
+      const lettersUpper = 26;
+      const digits = 10;
+      const charsetSize = lettersLower + lettersUpper + digits + specialChars.length;
+      return passphrase.length * Math.log2(charsetSize);
+    }
+
+    function generatePassphrase() {
+      const minLength = parseInt(document.getElementById('length').value, 10);
+
+      if (wordList.length === 0) {
+        alert("Wortliste nicht geladen.");
+        return;
+      }
+
+      let words = [];
+      let specialsUsed = 0;
+
+      while (words.join('').length + specialsUsed < minLength) {
+        words.push(capitalizeWordStart(wordList[Math.floor(Math.random() * wordList.length)]));
+      }
+
+      let passphrase = '';
+      for (let i = 0; i < words.length; i++) {
+        passphrase += words[i];
+        if (i < words.length - 1) {
+          const special = getRandomSpecials(1);
+          passphrase += special;
+          specialsUsed++;
+        }
+      }
+
+      while (passphrase.length < minLength) {
+        passphrase += getRandomSpecials(1);
+        specialsUsed++;
+      }
+
+      const entropy = calculateEntropy(words.length, specialsUsed);
+      const classicEntropy = calculateEntropyClassic(passphrase);
+
+      document.getElementById('output').textContent = passphrase;
+      document.getElementById('entropy').innerHTML = 
+        `Entropie: ${entropy.toFixed(2)} Bit<br>` +
+        `Entropie (klassisch): ${classicEntropy.toFixed(2)} Bit <br><br>Entropie-Rechner fungieren nach verschiedenen Rechenwegen. Dieser weicht womöglich vom gewohnten ab.`;
+    }
+
+    function copyToClipboard() {
+      const text = document.getElementById('output').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Kopiert!');
+      });
+    }
+  </script>
+</body>
+</html>
