@@ -187,6 +187,9 @@
         specialsUsed++;
       }
 
+      const randomDigit = Math.floor(Math.random() * 9) + 1;
+      passphrase += randomDigit;
+      
       const entropy = calculateEntropy(words.length, specialsUsed);
       const classicEntropy = calculateEntropyClassic(passphrase);
 
