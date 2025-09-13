@@ -3,48 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <title>Artikel</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { color: #333; }
+    p { line-height: 1.6; }
+    a { color: #0070f3; text-decoration: none; }
+  </style>
 </head>
 <body>
-  <h1 id="title">Lade Artikel…</h1>
-  <div id="content"></div>
+  <h1 id="artikel-title">Lade Artikel…</h1>
+  <div id="artikel-content">Bitte warten…</div>
+  <p><a href="/">Zurück zur Startseite</a></p>
 
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-    const supabaseUrl = 'https://ngtujvgsbymtxphwncuj.supabase.co'; // <--- deine Supabase URL
-    const supabaseKey = 'PUBLIC_ANON_KEY';        // <--- GitHub Secret / Anon Key
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
+  <script>
+    // URL-Parameter auslesen
     const params = new URLSearchParams(window.location.search);
-    const slug = params.get('slug');
-
-    const titleEl = document.getElementById('title');
-    const contentEl = document.getElementById('content');
+    const slug = params.get("slug");
 
     if (!slug) {
-      titleEl.innerText = "Kein Artikel ausgewählt";
-      contentEl.innerText = "Bitte URL mit ?slug=artikelname verwenden";
+      document.getElementById("artikel-title").textContent = "Kein Artikel ausgewählt";
+      document.getElementById("artikel-content").textContent = "Bitte über die URL einen Artikel-Slug angeben, z.B. ?slug=fancy-artikel";
     } else {
-      console.log("📌 Lade Artikel:", slug);
-
-      supabase
-        .storage
-        .from('articles')  // <--- Name deines Buckets
-        .download(`${slug}.json`)
+      // JSON aus Supabase laden
+      fetch(`https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/public/articles/${slug}.json`)
         .then(res => {
-          if (res.error) throw res.error;
-          return res.data.text();
+          if (!res.ok) throw new Error("Artikel nicht gefunden");
+          return res.json();
         })
-        .then(text => {
-          console.log("📌 Geladene JSON:", text);
-          const data = JSON.parse(text);
-          titleEl.innerText = data.title;
-          contentEl.innerHTML = data.content;
+        .then(data => {
+          document.getElementById("artikel-title").textContent = data.title;
+          document.getElementById("artikel-content").innerHTML = data.content;
         })
         .catch(err => {
-          console.error("❌ Fehler beim Laden:", err);
-          titleEl.innerText = "Artikel nicht gefunden";
-          contentEl.innerText = err.message;
+          console.error(err);
+          document.getElementById("artikel-title").textContent = "Fehler beim Laden des Artikels";
+          document.getElementById("artikel-content").textContent = err.message;
         });
     }
   </script>
