@@ -9,34 +9,37 @@
   <div id="content">Bitte warten...</div>
   <p><a href="/">Zurück zur Startseite</a></p>
 
-  <script>
-    // === 1. Slug aus URL auslesen ===
-    const params = new URLSearchParams(window.location.search);
-    const slug = params.get('slug');
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('slug');
 
-    if (!slug) {
-      document.getElementById('title').innerText = "Kein Artikel ausgewählt";
-      document.getElementById('content').innerText = "Bitte URL mit ?slug=artikelname verwenden";
-    } else {
-      // === 2. Supabase Bucket URL (Public oder über Signed URL) ===
-      const bucketBaseUrl = "https://xyz.supabase.co/storage/v1/object/public/articles";
+  if (!slug) {
+    document.getElementById('title').innerText = "Kein Artikel ausgewählt";
+    document.getElementById('content').innerText = "Bitte URL mit ?slug=artikelname verwenden";
+  } else {
+    const bucketBaseUrl = "https://xyz.supabase.co/storage/v1/object/public/articles"; // <--- anpassen
 
-      // === 3. JSON-Datei laden ===
-      fetch(`${bucketBaseUrl}/${slug}.json`)
-        .then(res => {
-          if (!res.ok) throw new Error("Artikel nicht gefunden");
-          return res.json();
-        })
-        .then(data => {
-          // Beispiel JSON: { "title": "Fancy Artikel", "content": "Mein Text hier..." }
-          document.getElementById('title').innerText = data.title;
-          document.getElementById('content').innerHTML = data.content;
-        })
-        .catch(err => {
-          document.getElementById('title').innerText = "Artikel nicht gefunden";
-          document.getElementById('content').innerText = err.message;
-        });
-    }
-  </script>
+    console.log("📌 Lade Artikel-Slug:", slug);
+    const url = `${bucketBaseUrl}/${slug}.json`;
+    console.log("📌 Fetch URL:", url);
+
+    fetch(url)
+      .then(res => {
+        console.log("📌 HTTP Status:", res.status, res.statusText);
+        if (!res.ok) throw new Error("Artikel nicht gefunden oder Zugriff verweigert");
+        return res.json();
+      })
+      .then(data => {
+        console.log("📌 Geladene JSON:", data);
+        document.getElementById('title').innerText = data.title;
+        document.getElementById('content').innerHTML = data.content;
+      })
+      .catch(err => {
+        console.error("❌ Fetch Fehler:", err);
+        document.getElementById('title').innerText = "Artikel nicht gefunden";
+        document.getElementById('content').innerText = err.message;
+      });
+  }
+</script>
 </body>
 </html>
