@@ -1,21 +1,38 @@
-name: Build HTML from JSON
+name: Build HTML from Supabase JSON
 
 on:
-  workflow_dispatch:      # manuell auslösbar im Browser
-  repository_dispatch:    # optional: von Supabase Webhook triggern
+  workflow_dispatch:  # manuell im Browser startbar
+  repository_dispatch:  # optional für Webhook
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Repo auschecken
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Node.js installieren
         uses: actions/setup-node@v3
         with:
           node-version: "20"
+
+      - name: JSONs von Supabase holen
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          mkdir supabase-json
+          curl -H "apikey: $SUPABASE_KEY" \
+               -H "Authorization: Bearer $SUPABASE_KEY" \
+               "$SUPABASE_URL/storage/v1/object/list/articles" \
+            > supabase-json/list.json
+          # einzelne JSONs downloaden
+          for f in $(jq -r '.[].name' supabase-json/list.json); do
+            curl -H "apikey: $SUPABASE_KEY" \
+                 -H "Authorization: Bearer $SUPABASE_KEY" \
+                 "$SUPABASE_URL/storage/v1/object/public/articles/$f" \
+              -o "supabase-json/$f"
+          done
 
       - name: HTML aus JSON bauen
         run: node build-articles.js
@@ -25,6 +42,5 @@ jobs:
         with:
           author_name: github-actions
           author_email: github-actions@users.noreply.github.com
-          message: "Build HTML aus JSON"
+          message: "Build HTML aus Supabase JSON"
           add: "_site/*"
-          
