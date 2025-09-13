@@ -1,0 +1,30 @@
+name: Build HTML from JSON
+
+on:
+  workflow_dispatch:      # manuell auslösbar im Browser
+  repository_dispatch:    # optional: von Supabase Webhook triggern
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v3
+
+      - name: Node.js installieren
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: HTML aus JSON bauen
+        run: node build-articles.js
+
+      - name: HTML pushen
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions
+          author_email: github-actions@users.noreply.github.com
+          message: "Build HTML aus JSON"
+          add: "_site/*"
+          
