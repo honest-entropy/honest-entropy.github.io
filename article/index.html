@@ -5,41 +5,48 @@
   <title>Artikel</title>
 </head>
 <body>
-  <h1 id="title">Lade...</h1>
-  <div id="content">Bitte warten...</div>
-  <p><a href="/">Zurück zur Startseite</a></p>
+  <h1 id="title">Lade Artikel…</h1>
+  <div id="content"></div>
 
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const slug = params.get('slug');
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-  if (!slug) {
-    document.getElementById('title').innerText = "Kein Artikel ausgewählt";
-    document.getElementById('content').innerText = "Bitte URL mit ?slug=artikelname verwenden";
-  } else {
-    const bucketBaseUrl = "https://xyz.supabase.co/storage/v1/object/public/articles"; // <--- anpassen
+    const supabaseUrl = 'https://ngtujvgsbymtxphwncuj.supabase.co'; // <--- deine Supabase URL
+    const supabaseKey = 'PUBLIC_ANON_KEY';        // <--- GitHub Secret / Anon Key
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log("📌 Lade Artikel-Slug:", slug);
-    const url = `${bucketBaseUrl}/${slug}.json`;
-    console.log("📌 Fetch URL:", url);
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
 
-    fetch(url)
-      .then(res => {
-        console.log("📌 HTTP Status:", res.status, res.statusText);
-        if (!res.ok) throw new Error("Artikel nicht gefunden oder Zugriff verweigert");
-        return res.json();
-      })
-      .then(data => {
-        console.log("📌 Geladene JSON:", data);
-        document.getElementById('title').innerText = data.title;
-        document.getElementById('content').innerHTML = data.content;
-      })
-      .catch(err => {
-        console.error("❌ Fetch Fehler:", err);
-        document.getElementById('title').innerText = "Artikel nicht gefunden";
-        document.getElementById('content').innerText = err.message;
-      });
-  }
-</script>
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('content');
+
+    if (!slug) {
+      titleEl.innerText = "Kein Artikel ausgewählt";
+      contentEl.innerText = "Bitte URL mit ?slug=artikelname verwenden";
+    } else {
+      console.log("📌 Lade Artikel:", slug);
+
+      supabase
+        .storage
+        .from('articles')  // <--- Name deines Buckets
+        .download(`${slug}.json`)
+        .then(res => {
+          if (res.error) throw res.error;
+          return res.data.text();
+        })
+        .then(text => {
+          console.log("📌 Geladene JSON:", text);
+          const data = JSON.parse(text);
+          titleEl.innerText = data.title;
+          contentEl.innerHTML = data.content;
+        })
+        .catch(err => {
+          console.error("❌ Fehler beim Laden:", err);
+          titleEl.innerText = "Artikel nicht gefunden";
+          contentEl.innerText = err.message;
+        });
+    }
+  </script>
 </body>
 </html>
