@@ -1,0 +1,21 @@
+name: Build Articles
+
+on:
+  workflow_dispatch:  # erlaubt manuelles Starten im Browser
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: node build-articles.js
+      - run: git config user.name "GitHub Actions"
+      - run: git config user.email "actions@github.com"
+      - run: git add -A
+      - run: git commit -m "Update articles" || echo "No changes"
+      - run: git push
+      
