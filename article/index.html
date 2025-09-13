@@ -2,14 +2,41 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title id="title">Artikel</title>
-  <link rel="stylesheet" href="../style.css">
+  <title>Artikel</title>
 </head>
 <body>
-  <a href="/">Zurück</a>
-  <h1 id="article-title"></h1>
-  <div id="article-content"></div>
+  <h1 id="title">Lade...</h1>
+  <div id="content">Bitte warten...</div>
+  <p><a href="/">Zurück zur Startseite</a></p>
 
-  <script type="module" src="../js/article.js"></script>
+  <script>
+    // === 1. Slug aus URL auslesen ===
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
+
+    if (!slug) {
+      document.getElementById('title').innerText = "Kein Artikel ausgewählt";
+      document.getElementById('content').innerText = "Bitte URL mit ?slug=artikelname verwenden";
+    } else {
+      // === 2. Supabase Bucket URL (Public oder über Signed URL) ===
+      const bucketBaseUrl = "https://xyz.supabase.co/storage/v1/object/public/articles";
+
+      // === 3. JSON-Datei laden ===
+      fetch(`${bucketBaseUrl}/${slug}.json`)
+        .then(res => {
+          if (!res.ok) throw new Error("Artikel nicht gefunden");
+          return res.json();
+        })
+        .then(data => {
+          // Beispiel JSON: { "title": "Fancy Artikel", "content": "Mein Text hier..." }
+          document.getElementById('title').innerText = data.title;
+          document.getElementById('content').innerHTML = data.content;
+        })
+        .catch(err => {
+          document.getElementById('title').innerText = "Artikel nicht gefunden";
+          document.getElementById('content').innerText = err.message;
+        });
+    }
+  </script>
 </body>
 </html>
