@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const articlesDir = path.join(__dirname, "articles");
+const articlesDir = path.join(__dirname, "supabase-json"); // statt local articles/
 const outDir = path.join(__dirname, "_site");
 
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
@@ -28,7 +28,5 @@ files.forEach(file => {
   `.trim();
 
   const slug = article.title.toLowerCase().replace(/\s+/g, "-");
-  const outPath = path.join(outDir, `${slug}.html`);
-  fs.writeFileSync(outPath, html);
-  console.log(`✔ ${outPath} erstellt`);
+  fs.writeFileSync(path.join(outDir, `${slug}.html`), html);
 });
