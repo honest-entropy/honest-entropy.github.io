@@ -3,12 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Artikel</title>
-  <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { color: #333; }
-    p { line-height: 1.6; }
-    a { color: #0070f3; text-decoration: none; }
-  </style>
 </head>
 <body>
   <h1 id="artikel-title">Lade Artikel…</h1>
@@ -16,30 +10,50 @@
   <p><a href="/">Zurück zur Startseite</a></p>
 
   <script>
+    console.log("📌 Script gestartet");
+
     // URL-Parameter auslesen
     const params = new URLSearchParams(window.location.search);
     const slug = params.get("slug");
+    console.log("🔹 Gefundener Slug:", slug);
 
     if (!slug) {
+      console.warn("⚠️ Kein Slug angegeben");
       document.getElementById("artikel-title").textContent = "Kein Artikel ausgewählt";
       document.getElementById("artikel-content").textContent = "Bitte über die URL einen Artikel-Slug angeben, z.B. ?slug=fancy-artikel";
     } else {
-      // JSON aus Supabase laden
-      fetch(`https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/public/articles/${slug}.json`)
+      const url = `https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/public/articles/${slug}.json`;
+      console.log("🌐 Fetch URL:", url);
+
+      fetch(url)
         .then(res => {
-          if (!res.ok) throw new Error("Artikel nicht gefunden");
-          return res.json();
+          console.log("📦 Response Status:", res.status, res.statusText);
+          if (!res.ok) throw new Error("Artikel nicht gefunden oder Zugriff verweigert");
+          return res.text(); // erst mal als Text, um mögliche Fehler zu sehen
         })
-        .then(data => {
+        .then(text => {
+          console.log("📄 Geladener Text:", text);
+
+          let data;
+          try {
+            data = JSON.parse(text);
+            console.log("✅ JSON erfolgreich geparst:", data);
+          } catch(e) {
+            console.error("❌ JSON Parsing Fehler:", e, "Text war:", text);
+            throw e;
+          }
+
           document.getElementById("artikel-title").textContent = data.title;
           document.getElementById("artikel-content").innerHTML = data.content;
         })
         .catch(err => {
-          console.error(err);
+          console.error("💥 Fehler beim Laden des Artikels:", err);
           document.getElementById("artikel-title").textContent = "Fehler beim Laden des Artikels";
           document.getElementById("artikel-content").textContent = err.message;
         });
     }
+
+    console.log("📌 Script Ende");
   </script>
 </body>
 </html>
