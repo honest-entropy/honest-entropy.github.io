@@ -18,7 +18,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get install -y curl jq
 
-      - name: Debug: Lade Artikel von Supabase
+      - name: "Debug: Lade Artikel von Supabase"
         env:
           SUPABASE_URL: https://ngtujvgsbymtxphwncuj.supabase.co
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
