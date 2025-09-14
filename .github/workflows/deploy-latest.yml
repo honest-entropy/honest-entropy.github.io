@@ -41,7 +41,7 @@ jobs:
           filename="public/${slug}.html"
       
           # Template laden und Platzhalter ersetzen
-          sed "s/{{TITLE}}/$title/g; s/{{CONTENT}}/$content/g" templates/template.html > "$filename"
+          sed "s/{{TITLE}}/$title/g; s/{{CONTENT}}/$content/g" template.html > "$filename"
       
           echo "HTML gebaut: $filename"
 
