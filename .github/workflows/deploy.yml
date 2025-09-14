@@ -18,7 +18,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get install -y curl jq
 
-      - name: Lade Artikel von Supabase
+      - name: Debug: Lade Artikel von Supabase
         env:
           SUPABASE_URL: https://ngtujvgsbymtxphwncuj.supabase.co
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -28,15 +28,18 @@ jobs:
           resp=$(curl -s "$SUPABASE_URL/storage/v1/object/list/articles" \
             -H "Authorization: Bearer $SUPABASE_KEY")
 
+          # Ausgabe der Rohdaten
+          echo "Supabase raw response:"
+          echo "$resp" | jq .
+
           # Prüfen ob data null ist
           if [ "$(echo "$resp" | jq '.data')" = "null" ]; then
             echo "Fehler: Supabase returned null, keine Artikel gefunden oder falscher Key/URL"
-            echo "$resp"
             exit 1
           fi
 
           # Alle Dateinamen extrahieren
-          files=$(echo "$resp" | jq -r '.data[].name // empty')
+          files=$(echo "$resp" | jq -r '.data[]?.name // empty')
           if [ -z "$files" ]; then
             echo "Keine Artikel gefunden, Workflow beendet."
             exit 0
@@ -66,4 +69,3 @@ jobs:
           git add public/
           git commit -m "Neue Artikel gebaut" || echo "Nichts zu committen"
           git push
-          
