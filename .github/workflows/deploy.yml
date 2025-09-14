@@ -1,4 +1,4 @@
-name: Deploy Articles
+name: Deploy Articles 
 
 on:
   workflow_dispatch:
