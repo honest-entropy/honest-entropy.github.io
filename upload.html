@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Artikel-Upload</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Artikel hochladen</h1>
+
+  <!-- Login -->
+  <div id="login">
+    <input type="email" id="email" placeholder="E-Mail"><br>
+    <input type="password" id="password" placeholder="Passwort"><br>
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- Upload -->
+  <div id="upload" style="display:none;">
+    <textarea id="content" rows="10" cols="50" placeholder="Artikeltext hier..."></textarea><br>
+    <input type="text" id="filename" placeholder="Dateiname (z.B. artikel1.txt)"><br>
+    <button onclick="upload()">Hochladen</button>
+  </div>
+
+  <script>
+    // Supabase Client
+    const client = supabase.createClient(
+      "https://ngtujvgsbymtxphwncuj.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0"
+    );
+
+    // Login
+    async function login() {
+      try {
+        const { data, error } = await client.auth.signInWithPassword({
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value,
+        });
+        if (error) {
+          console.error("Login Fehler:", error);
+          alert("Login fehlgeschlagen: " + error.message);
+          return;
+        }
+        console.log("Login erfolgreich:", data);
+        document.getElementById("login").style.display = "none";
+        document.getElementById("upload").style.display = "block";
+      } catch (err) {
+        console.error("Exception beim Login:", err);
+      }
+    }
+
+    // Upload + Workflow Trigger
+    async function upload() {
+      const filename = document.getElementById("filename").value;
+      const content = document.getElementById("content").value;
+
+      try {
+        const { error } = await client.storage
+          .from("articles")
+          .upload(filename, new Blob([content], { type: "text/plain" }), {
+            upsert: true,
+          });
+
+        if (error) {
+          console.error("Upload Fehler:", error);
+          alert("Upload fehlgeschlagen: " + error.message);
+          return;
+        }
+
+        console.log("Upload erfolgreich:", filename);
+        alert("Upload erfolgreich! Trigger GitHub Workflow...");
+
+        // Trigger Supabase Function
+        const resp = await fetch(
+          "https://ngtujvgsbymtxphwncuj.functions.supabase.co/trigger-github",
+          { method: "POST" }
+        );
+
+        const text = await resp.text();
+        console.log("Supabase Function Response Status:", resp.status);
+        console.log("Supabase Function Response Body:", text);
+
+        if (resp.ok) {
+          alert("GitHub Workflow getriggert!");
+        } else {
+          alert("Fehler beim Workflow-Trigger: " + text);
+        }
+
+      } catch (err) {
+        console.error("Exception beim Upload/Trigger:", err);
+        alert("Fehler: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
