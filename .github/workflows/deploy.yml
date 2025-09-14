@@ -25,7 +25,7 @@ jobs:
         run: |
           mkdir -p articles
           curl -s "$SUPABASE_URL/storage/v1/object/list/articles" \
-            -H "Authorization: Bearer $SUPABASE_KEY" | jq -r '.[].name' > files.txt
+            -H "Authorization: Bearer $SUPABASE_KEY" | jq -r '.data[].name' > files.txt
           while read f; do
             curl -s "$SUPABASE_URL/storage/v1/object/articles/$f" \
               -H "Authorization: Bearer $SUPABASE_KEY" \
