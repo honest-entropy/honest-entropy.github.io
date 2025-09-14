@@ -32,57 +32,18 @@ jobs:
           echo "Inhalt:"
           cat work/latest.json | jq .
 
-      - name: Build HTML from latest.json
+      - name: Build HTML from template
         run: |
-          set -euo pipefail
-          mkdir -p public
-
           title=$(jq -r '.title // empty' work/latest.json)
           content=$(jq -r '.content // empty' work/latest.json)
-
-          if [ -z "$title" ]; then
-            echo "Kein title in latest.json gefunden. Abbruch."
-            exit 1
-          fi
-
-          # Slugify title (Versuch mit iconv, sonst einfache Ersetzung)
-          if command -v iconv >/dev/null 2>&1; then
-            try_slug=$(echo "$title" | iconv -t ascii//TRANSLIT 2>/dev/null || echo "$title")
-          else
-            try_slug="$title"
-          fi
-
-          title_slug=$(echo "$try_slug" \
-            | tr '[:upper:]' '[:lower:]' \
-            | sed -E 's/[^a-z0-9]+/-/g' \
-            | sed -E 's/^-|-$//g')
-
-          if [ -z "$title_slug" ]; then
-            echo "Slug wäre leer — Titel enthält keine geeigneten Zeichen. Abbruch."
-            exit 1
-          fi
-
-          filename="public/${title_slug}.html"
-          echo "Erstelle $filename (Titel: $title)"
-
-          # Kopf der HTML-Datei
-          printf '%s\n' "<!doctype html>" "<html lang=\"de\">" "<head>" \
-            "<meta charset=\"utf-8\">" "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" \
-            "<title>${title}</title>" \
-            "<style>" \
-            "body { font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial; max-width: 800px; margin: 2rem auto; line-height:1.6; padding: 0 1rem; }" \
-            "article { white-space: pre-line; }" \
-            "</style>" \
-            "</head>" "<body>" "<article>" > "$filename"
-
-          # Inhalt (sicher anhängen)
-          printf '%s\n' "$content" >> "$filename"
-
-          # Fuß der HTML-Datei
-          printf '%s\n' "</article>" "</body>" "</html>" >> "$filename"
-
+      
+          slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-|-$//g')
+          filename="public/${slug}.html"
+      
+          # Template laden und Platzhalter ersetzen
+          sed "s/{{TITLE}}/$title/g; s/{{CONTENT}}/$content/g" templates/template.html > "$filename"
+      
           echo "HTML gebaut: $filename"
-          ls -l "$filename" || true
 
       - name: Commit & Push public/
         env:
