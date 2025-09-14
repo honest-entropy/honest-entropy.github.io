@@ -69,3 +69,4 @@ jobs:
           git add public/
           git commit -m "Neue Artikel gebaut" || echo "Nichts zu committen"
           git push
+          
