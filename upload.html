@@ -26,14 +26,15 @@
   </div>
 
   <script>
-    // --- Supabase Projektdaten (anpassen falls anders) ---
+    // --- Supabase Projektdaten ---
     const SUPABASE_URL = "https://ngtujvgsbymtxphwncuj.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0"; // falls du anders willst: ersetzen
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0";
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // korrekt initialisieren
+    const { createClient } = window.supabase;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // URL deiner Supabase Function, die das GitHub-Workflow-dispatch macht
-    // (nach Deploy ersetzten)
+    // Edge Function URL (wird gleich angepasst, wenn du sie deployt hast)
     const TRIGGER_FUNC_URL = "https://ngtujvgsbymtxphwncuj.functions.supabase.co/trigger-github";
 
     const $login = document.getElementById("login");
@@ -45,7 +46,7 @@
       try {
         const email = document.getElementById("email").value;
         const password = document.getElementById("password").value;
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         $status.textContent = "Login erfolgreich.";
         $login.style.display = "none";
@@ -63,26 +64,20 @@
 
       if (!title) { $status.textContent = "Bitte Titel angeben."; return; }
 
-      // build JSON
       const obj = { title, content, uploaded_at: new Date().toISOString() };
       const blob = new Blob([JSON.stringify(obj)], { type: "application/json" });
-      const filename = "latest.json";
 
       try {
-        // ensure bucket exists & user is allowed to upload by your Policies
         const { error: uploadErr } = await supabase.storage
           .from("articles")
-          .upload(filename, blob, { upsert: true });
+          .upload("latest.json", blob, { upsert: true });
 
         if (uploadErr) throw uploadErr;
 
-        console.log("Upload erfolgreich:", filename);
         $status.textContent = "Upload erfolgreich — Workflow wird getriggert...";
 
-        // Trigger Supabase Edge Function (die den GitHub Workflow dispatch auslöst)
         const resp = await fetch(TRIGGER_FUNC_URL, { method: "POST" });
         const text = await resp.text().catch(() => null);
-        console.log("Trigger Response:", resp.status, text);
         if (resp.ok) {
           $status.textContent = "Workflow getriggert — warte auf GitHub Actions.";
         } else {
