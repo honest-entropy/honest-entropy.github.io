@@ -1,96 +1,98 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>Artikel-Upload</title>
+  <meta charset="utf-8" />
+  <title>Artikel Upload (latest.json)</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; }
+    textarea { width: 100%; }
+  </style>
 </head>
 <body>
-  <h1>Artikel hochladen</h1>
+  <h1>Artikel Upload</h1>
 
-  <!-- Login -->
   <div id="login">
-    <input type="email" id="email" placeholder="E-Mail"><br>
-    <input type="password" id="password" placeholder="Passwort"><br>
-    <button onclick="login()">Login</button>
+    <input id="email" type="email" placeholder="E-Mail" /><br/>
+    <input id="password" type="password" placeholder="Passwort" /><br/>
+    <button id="btnLogin">Login</button>
   </div>
 
-  <!-- Upload -->
-  <div id="upload" style="display:none;">
-    <textarea id="content" rows="10" cols="50" placeholder="Artikeltext hier..."></textarea><br>
-    <input type="text" id="filename" placeholder="Dateiname (z.B. artikel1.txt)"><br>
-    <button onclick="upload()">Hochladen</button>
+  <div id="editor" style="display:none;">
+    <input id="title" type="text" placeholder="Titel" style="width:100%" /><br/><br/>
+    <textarea id="content" rows="12" placeholder="Artikeltext (Plaintext / Markdown)"></textarea><br/>
+    <button id="btnUpload">Als latest.json hochladen & deployen</button>
+    <p id="status"></p>
   </div>
 
   <script>
-    // Supabase Client
-    const client = supabase.createClient(
-      "https://ngtujvgsbymtxphwncuj.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0"
-    );
+    // --- Supabase Projektdaten (anpassen falls anders) ---
+    const SUPABASE_URL = "https://ngtujvgsbymtxphwncuj.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0"; // falls du anders willst: ersetzen
 
-    // Login
-    async function login() {
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // URL deiner Supabase Function, die das GitHub-Workflow-dispatch macht
+    // (nach Deploy ersetzten)
+    const TRIGGER_FUNC_URL = "https://ngtujvgsbymtxphwncuj.functions.supabase.co/trigger-github";
+
+    const $login = document.getElementById("login");
+    const $editor = document.getElementById("editor");
+    const $status = document.getElementById("status");
+
+    document.getElementById("btnLogin").onclick = async () => {
+      $status.textContent = "Logge ein…";
       try {
-        const { data, error } = await client.auth.signInWithPassword({
-          email: document.getElementById("email").value,
-          password: document.getElementById("password").value,
-        });
-        if (error) {
-          console.error("Login Fehler:", error);
-          alert("Login fehlgeschlagen: " + error.message);
-          return;
-        }
-        console.log("Login erfolgreich:", data);
-        document.getElementById("login").style.display = "none";
-        document.getElementById("upload").style.display = "block";
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        $status.textContent = "Login erfolgreich.";
+        $login.style.display = "none";
+        $editor.style.display = "block";
       } catch (err) {
-        console.error("Exception beim Login:", err);
+        console.error(err);
+        $status.textContent = "Login fehlgeschlagen: " + (err.message || err);
       }
-    }
+    };
 
-    // Upload + Workflow Trigger
-    async function upload() {
-      const filename = document.getElementById("filename").value;
+    document.getElementById("btnUpload").onclick = async () => {
+      $status.textContent = "Upload läuft...";
+      const title = document.getElementById("title").value.trim();
       const content = document.getElementById("content").value;
 
-      try {
-        const { error } = await client.storage
-          .from("articles")
-          .upload(filename, new Blob([content], { type: "text/plain" }), {
-            upsert: true,
-          });
+      if (!title) { $status.textContent = "Bitte Titel angeben."; return; }
 
-        if (error) {
-          console.error("Upload Fehler:", error);
-          alert("Upload fehlgeschlagen: " + error.message);
-          return;
-        }
+      // build JSON
+      const obj = { title, content, uploaded_at: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(obj)], { type: "application/json" });
+      const filename = "latest.json";
+
+      try {
+        // ensure bucket exists & user is allowed to upload by your Policies
+        const { error: uploadErr } = await supabase.storage
+          .from("articles")
+          .upload(filename, blob, { upsert: true });
+
+        if (uploadErr) throw uploadErr;
 
         console.log("Upload erfolgreich:", filename);
-        alert("Upload erfolgreich! Trigger GitHub Workflow...");
+        $status.textContent = "Upload erfolgreich — Workflow wird getriggert...";
 
-        // Trigger Supabase Function
-        const resp = await fetch(
-          "https://ngtujvgsbymtxphwncuj.functions.supabase.co/trigger-github",
-          { method: "POST" }
-        );
-
-        const text = await resp.text();
-        console.log("Supabase Function Response Status:", resp.status);
-        console.log("Supabase Function Response Body:", text);
-
+        // Trigger Supabase Edge Function (die den GitHub Workflow dispatch auslöst)
+        const resp = await fetch(TRIGGER_FUNC_URL, { method: "POST" });
+        const text = await resp.text().catch(() => null);
+        console.log("Trigger Response:", resp.status, text);
         if (resp.ok) {
-          alert("GitHub Workflow getriggert!");
+          $status.textContent = "Workflow getriggert — warte auf GitHub Actions.";
         } else {
-          alert("Fehler beim Workflow-Trigger: " + text);
+          $status.textContent = "Fehler beim Trigger: " + (text || resp.status);
         }
-
       } catch (err) {
-        console.error("Exception beim Upload/Trigger:", err);
-        alert("Fehler: " + err.message);
+        console.error("Fehler:", err);
+        $status.textContent = "Fehler: " + (err.message || err);
       }
-    }
+    };
   </script>
 </body>
 </html>
