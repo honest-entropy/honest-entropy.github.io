@@ -1,71 +1,87 @@
-name: Deploy Articles 
+name: Deploy Latest Article
 
 on:
   workflow_dispatch:
-    inputs:
-      message:
-        description: "Optionaler Nachrichtentext"
-        required: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repo
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Dependencies
-        run: sudo apt-get install -y curl jq
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y curl jq
 
-      - name: "Debug: Lade Artikel von Supabase"
+      - name: Download latest.json from Supabase
         env:
           SUPABASE_URL: https://ngtujvgsbymtxphwncuj.supabase.co
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          mkdir -p articles
-          echo "Liste der Artikel abrufen..."
-          resp=$(curl -s "$SUPABASE_URL/storage/v1/object/list/articles" \
-            -H "Authorization: Bearer $SUPABASE_KEY")
+          mkdir -p work
+          echo "Herunterladen latest.json ..."
+          # lade die Datei latest.json (private bucket) herunter
+          curl -s -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/storage/v1/object/articles/latest.json" -o work/latest.json
 
-          # Ausgabe der Rohdaten
-          echo "Supabase raw response:"
-          echo "$resp" | jq .
-
-          # Prüfen ob data null ist
-          if [ "$(echo "$resp" | jq '.data')" = "null" ]; then
-            echo "Fehler: Supabase returned null, keine Artikel gefunden oder falscher Key/URL"
+          if [ ! -s work/latest.json ]; then
+            echo "latest.json fehlt oder ist leer. Abbruch."
             exit 1
           fi
 
-          # Alle Dateinamen extrahieren
-          files=$(echo "$resp" | jq -r '.data[]?.name // empty')
-          if [ -z "$files" ]; then
-            echo "Keine Artikel gefunden, Workflow beendet."
-            exit 0
-          fi
+          echo "Inhalt:"
+          cat work/latest.json | jq .
 
-          # Artikel herunterladen
-          for f in $files; do
-            curl -s "$SUPABASE_URL/storage/v1/object/articles/$f" \
-              -H "Authorization: Bearer $SUPABASE_KEY" \
-              -o "articles/$f"
-          done
-
-      - name: Konvertiere Artikel zu HTML
+      - name: Build HTML from latest.json
         run: |
           mkdir -p public
-          for file in articles/*; do
-            name=$(basename "$file" .txt)
-            echo "<!DOCTYPE html><html><head><meta charset='utf-8'><title>$name</title></head><body><article>" > public/$name.html
-            cat "$file" >> public/$name.html
-            echo "</article></body></html>" >> public/$name.html
-          done
+          title=$(jq -r '.title // empty' work/latest.json)
+          content=$(jq -r '.content // empty' work/latest.json)
 
-      - name: Commit & Push
+          if [ -z "$title" ]; then
+            echo "Kein title in latest.json gefunden. Abbruch."
+            exit 1
+          fi
+
+          # Sanitize title -> safe filename
+          # transliterate, lowercase, replace non-alnum with '-'
+          title_slug=$(echo "$title" | iconv -t ascii//TRANSLIT 2>/dev/null || echo "$title")
+          title_slug=$(echo "$title_slug" | tr '[:upper:]' '[:lower:]')
+          title_slug=$(echo "$title_slug" | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-|-$//g')
+          filename="public/${title_slug}.html"
+
+          echo "Erstelle $filename (Titel: $title)"
+          cat > "$filename" <<HTML
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; max-width: 800px; margin: 2rem auto; line-height:1.6; padding: 0 1rem;}
+    article { white-space: pre-line; } /* Newlines im content werden sichtbar */
+  </style>
+</head>
+<body>
+  <article>
+$(jq -r '.content' work/latest.json)
+  </article>
+</body>
+</html>
+HTML
+
+          echo "HTML gebaut: $filename"
+          ls -l public || true
+
+      - name: Commit & Push public/
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "${GIT_AUTHOR_NAME}"
+          git config user.email "${GIT_AUTHOR_EMAIL}"
           git add public/
-          git commit -m "Neue Artikel gebaut" || echo "Nichts zu committen"
+          git commit -m "Deploy latest article: ${GITHUB_RUN_ID}" || echo "Nothing to commit"
           git push
