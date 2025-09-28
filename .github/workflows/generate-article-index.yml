@@ -3,7 +3,7 @@ name: Generate Article Index
 on:
   push:
     paths:
-      - 'article/**'
+      - 'public/**'
   workflow_dispatch:
 
 jobs:
