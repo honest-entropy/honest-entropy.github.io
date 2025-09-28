@@ -16,7 +16,7 @@ jobs:
       - name: Generate articles.json
         run: |
           echo "[" > articles.json
-          for f in article/*.html; do
+          for f in public/*.html; do
             echo "  \"${f}\"," >> articles.json
           done
           # letztes Komma entfernen
