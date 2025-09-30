@@ -25,7 +25,7 @@ jobs:
             json_file="${base}.json"
 
             # JSON von Supabase laden
-            data=$(curl -s "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/${json_file}?token=${{ secrets.SUPABASE_ANON_KEY }}")
+            data=$(curl -s "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/${json_file}?token=${{ secrets.SUPABASE_SERVICE_KEY }}")
 
             # Titel und Datum extrahieren
             title=$(echo "$data" | jq -r '.title // empty')
