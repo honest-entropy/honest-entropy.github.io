@@ -13,11 +13,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Generate articles.json
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq curl
+
+      - name: Generate articles.json with date
         run: |
           echo "[" > articles.json
-          for f in public/*.html; do
-            echo "  \"${f}\"," >> articles.json
+          for f in articles/*.json; do
+            # JSON von Supabase laden
+            data=$(curl -s "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/$(basename "$f")?token=${{ secrets.SUPABASE_ANON_KEY }}")
+            # Titel und Datum extrahieren
+            title=$(echo "$data" | jq -r '.title // empty')
+            date=$(echo "$data" | jq -r '.uploaded_at // empty')
+            if [ -n "$title" ] && [ -n "$date" ]; then
+              echo "  {\"title\": \"$title\", \"date\": \"$date\"}," >> articles.json
+            fi
           done
           # letztes Komma entfernen
           sed -i '$ s/,$//' articles.json
@@ -28,5 +38,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add articles.json
-          git commit -m "Update articles.json" || echo "No changes"
+          git commit -m "Update articles.json with dates" || echo "No changes"
           git push
