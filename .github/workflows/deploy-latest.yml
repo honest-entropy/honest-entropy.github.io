@@ -1,57 +1,46 @@
-name: Deploy Latest Article
+name: Generate Article Index
 
 on:
+  push:
+    paths:
+      - '**'
   workflow_dispatch:
 
 jobs:
-  build:
+  generate-index:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y curl jq
-
-      - name: Download latest.json from Supabase
-        env:
-          SUPABASE_URL: https://ngtujvgsbymtxphwncuj.supabase.co
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      - name: Build article page from latest.json
         run: |
-          mkdir -p work
-          echo "Herunterladen latest.json ..."
-          curl -s -H "Authorization: Bearer $SUPABASE_KEY" \
-            "$SUPABASE_URL/storage/v1/object/articles/latest.json" -o work/latest.json
+          # Werte aus latest.json auslesen
+          TITLE=$(jq -r '.title' latest.json)
+          PREVIEW=$(jq -r '.preview' latest.json)
+          CONTENT=$(jq -r '.content' latest.json)
 
-          if [ ! -s work/latest.json ]; then
-            echo "latest.json fehlt oder ist leer. Abbruch."
-            exit 1
-          fi
-
-          echo "Inhalt:"
-          cat work/latest.json | jq .
-
-      - name: Build HTML from template
-        run: |
-          title=$(jq -r '.title // empty' work/latest.json)
-          content=$(jq -r '.content // empty' work/latest.json)
-      
-          slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-|-$//g')
-          filename="public/${slug}.html"
-      
           # Template laden und Platzhalter ersetzen
-          sed "s/{{TITLE}}/$title/g; s/{{CONTENT}}/$content/g" template.html > "$filename"
-      
-          echo "HTML gebaut: $filename"
+          mkdir -p public
+          sed -e "s|{{TITLE}}|$TITLE|g" \
+              -e "s|{{PREVIEW}}|$PREVIEW|g" \
+              -e "s|{{CONTENT}}|$CONTENT|g" \
+              template.html > public/article.html
 
-      - name: Commit & Push public/
-        env:
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+      - name: Generate articles.json
         run: |
-          git config user.name "${GIT_AUTHOR_NAME}"
-          git config user.email "${GIT_AUTHOR_EMAIL}"
-          git add public/
-          git commit -m "Deploy latest article: ${GITHUB_RUN_ID}" || echo "Nothing to commit"
+          echo "[" > articles.json
+          for f in public/*.html; do
+            echo "  \"${f}\"," >> articles.json
+          done
+          # letztes Komma entfernen
+          sed -i '$ s/,$//' articles.json
+          echo "]" >> articles.json
+
+      - name: Commit and push generated files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/ articles.json
+          git commit -m "Update generated article + index" || echo "No changes"
           git push
