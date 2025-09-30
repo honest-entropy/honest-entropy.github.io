@@ -1,7 +1,11 @@
-name: Deploy Latest Article
+name: Deploy Article
 
 on:
   workflow_dispatch:
+    inputs:
+      filename:
+        description: 'JSON-Dateiname'
+        required: true
 
 jobs:
   build:
@@ -11,42 +15,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install tools
+      - name: Install Tools
         run: sudo apt-get update && sudo apt-get install -y curl jq
 
-      - name: Download latest.json from Supabase
+      - name: Download Article JSON from Supabase
         env:
           SUPABASE_URL: https://ngtujvgsbymtxphwncuj.supabase.co
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           mkdir -p work
-          echo "Herunterladen latest.json ..."
+          filename="${{ github.event.inputs.filename }}"
+          echo "Downloading $filename ..."
           curl -s -H "Authorization: Bearer $SUPABASE_KEY" \
-            "$SUPABASE_URL/storage/v1/object/articles/latest.json" -o work/latest.json
-
-          if [ ! -s work/latest.json ]; then
-            echo "latest.json fehlt oder ist leer. Abbruch."
+            "$SUPABASE_URL/storage/v1/object/articles/$filename" -o work/article.json
+          if [ ! -s work/article.json ]; then
+            echo "JSON fehlt oder leer. Abbruch."
             exit 1
           fi
-
-          echo "Inhalt:"
-          cat work/latest.json | jq .
+          cat work/article.json | jq .
 
       - name: Build HTML from template
         run: |
-          title=$(jq -r '.title // empty' work/latest.json)
-          preview=$(jq -r '.preview // empty' work/latest.json)
-          content=$(jq -r '.content // empty' work/latest.json)
-
+          title=$(jq -r '.title // empty' work/article.json)
+          content=$(jq -r '.content // empty' work/article.json)
+          preview=$(jq -r '.preview // empty' work/article.json)
           slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-|-$//g')
           filename="public/${slug}.html"
-
-          # Template laden und Platzhalter ersetzen
-          sed "s/{{TITLE}}/$title/g; s/{{PREVIEW}}/$preview/g; s/{{CONTENT}}/$content/g" template.html > "$filename"
-
+          sed "s/{{TITLE}}/$title/g; s/{{CONTENT}}/$content/g; s/{{PREVIEW}}/$preview/g" template.html > "$filename"
           echo "HTML gebaut: $filename"
 
-      - name: Commit & Push public/
+      - name: Commit & Push
         env:
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
@@ -54,5 +52,5 @@ jobs:
           git config user.name "${GIT_AUTHOR_NAME}"
           git config user.email "${GIT_AUTHOR_EMAIL}"
           git add public/
-          git commit -m "Deploy latest article: ${GITHUB_RUN_ID}" || echo "Nothing to commit"
+          git commit -m "Deploy article: $filename" || echo "Nothing to commit"
           git push
