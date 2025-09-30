@@ -19,24 +19,32 @@ jobs:
       - name: Generate articles.json with title + date
         run: |
           echo "[" > articles.json
+          first=true
           for f in public/*.html; do
             # HTML-Dateiname in JSON-Dateiname umwandeln
             base=$(basename "$f" .html)
             json_file="${base}.json"
 
-            # JSON von Supabase laden
-            data=$(curl -s "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/${json_file}?token=${{ secrets.SUPABASE_SERVICE_KEY }}")
+            # JSON von Supabase laden (privater Bucket -> Auth Header!)
+            data=$(curl -s \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/${json_file}"
+            )
 
             # Titel und Datum extrahieren
             title=$(echo "$data" | jq -r '.title // empty')
             date=$(echo "$data" | jq -r '.uploaded_at // empty')
 
             if [ -n "$title" ] && [ -n "$date" ]; then
-              echo "  {\"title\": \"$title\", \"date\": \"$date\"}," >> articles.json
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo "," >> articles.json
+              fi
+              echo "  {\"title\": \"$title\", \"date\": \"$date\"}" >> articles.json
             fi
           done
-          # letztes Komma entfernen
-          sed -i '$ s/,$//' articles.json
           echo "]" >> articles.json
 
       - name: Commit and push articles.json
