@@ -16,7 +16,7 @@ jobs:
           curl -s --head https://jgdbrtxptkfvxfovbsix.supabase.co | head -n 1
 
           echo "Pinging Supabase Project 2..."
-          curl -s --head https://ngtujvgsbymtxphwncuj | head -n 1
+          curl -s --head https://ngtujvgsbymtxphwncuj.supabase.co | head -n 1
 
           echo "Pinging Supabase Project 3..."
           curl -s --head https://euuptkidjsquvhohvicv.supabase.co | head -n 1
