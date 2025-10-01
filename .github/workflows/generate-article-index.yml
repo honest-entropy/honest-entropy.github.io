@@ -21,8 +21,8 @@ jobs:
           SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_KEY }}"
           SUPABASE_URL="https://ngtujvgsbymtxphwncuj.supabase.co"
 
-          tmpfile=$(mktemp)
-          echo "[" > $tmpfile
+          # leeres Array starten
+          all="[]"
 
           for f in public/*.html; do
             base=$(basename "$f" .html)
@@ -37,16 +37,20 @@ jobs:
             preview=$(echo "$data" | jq -r '.preview // empty')
 
             if [ -n "$title" ] && [ -n "$date" ]; then
-              echo "{\"title\":\"$title\",\"date\":\"$date\",\"preview\":\"$preview\"}" >> $tmpfile
+              obj=$(jq -n \
+                --arg t "$title" \
+                --arg d "$date" \
+                --arg p "$preview" \
+                '{title:$t, date:$d, preview:$p}')
+              all=$(echo "$all" | jq ". + [$obj]")
             fi
           done
 
-          echo "]" >> $tmpfile
-
-          # Jetzt sortieren nach date (neueste zuerst) und nur bei den ersten 3 preview drinlassen
-          jq 'sort_by(.date) | reverse
+          # sortieren + nur bei den ersten 3 preview behalten
+          echo "$all" | jq 'sort_by(.date) | reverse
               | to_entries
-              | map(if .key < 3 then .value else (.value | del(.preview)) end)' $tmpfile > articles.json
+              | map(if .key < 3 then .value else (.value | del(.preview)) end)' > articles.json
+
 
       - name: Commit and push articles.json
         run: |
