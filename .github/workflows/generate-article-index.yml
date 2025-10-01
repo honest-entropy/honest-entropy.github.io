@@ -18,15 +18,13 @@ jobs:
 
       - name: Generate articles.json with title + date (+preview for latest 3)
         run: |
-          # Supabase Service Key aus Secrets holen
           SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_KEY }}"
           SUPABASE_URL="https://ngtujvgsbymtxphwncuj.supabase.co"
 
-          files=($(ls -t public/*.html)) # sortiert nach Änderungszeit, neueste zuerst
+          tmpfile=$(mktemp)
+          echo "[" > $tmpfile
 
-          echo "[" > articles.json
-          idx=0
-          for f in "${files[@]}"; do
+          for f in public/*.html; do
             base=$(basename "$f" .html)
             json_file="${base}.json"
 
@@ -36,20 +34,19 @@ jobs:
 
             title=$(echo "$data" | jq -r '.title // empty')
             date=$(echo "$data" | jq -r '.uploaded_at // empty')
+            preview=$(echo "$data" | jq -r '.preview // empty')
 
             if [ -n "$title" ] && [ -n "$date" ]; then
-              if [ $idx -lt 3 ]; then
-                preview=$(echo "$data" | jq -r '.preview // empty')
-                echo "  {\"title\": \"$title\", \"date\": \"$date\", \"preview\": \"$preview\"}," >> articles.json
-              else
-                echo "  {\"title\": \"$title\", \"date\": \"$date\"}," >> articles.json
-              fi
-              idx=$((idx+1))
+              echo "{\"title\":\"$title\",\"date\":\"$date\",\"preview\":\"$preview\"}" >> $tmpfile
             fi
           done
-          # letztes Komma entfernen
-          sed -i '$ s/,$//' articles.json
-          echo "]" >> articles.json
+
+          echo "]" >> $tmpfile
+
+          # Jetzt sortieren nach date (neueste zuerst) und nur bei den ersten 3 preview drinlassen
+          jq 'sort_by(.date) | reverse
+              | to_entries
+              | map(if .key < 3 then .value else (.value | del(.preview)) end)' $tmpfile > articles.json
 
       - name: Commit and push articles.json
         run: |
