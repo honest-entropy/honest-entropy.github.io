@@ -1,0 +1,27 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Täglich um 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Supabase Projects
+        run: |
+          echo "Pinging Supabase Project 1..."
+          curl -s --head https://jgdbrtxptkfvxfovbsix.supabase.co | head -n 1
+
+          echo "Pinging Supabase Project 2..."
+          curl -s --head https://ngtujvgsbymtxphwncuj | head -n 1
+
+          echo "Pinging Supabase Project 3..."
+          curl -s --head https://euuptkidjsquvhohvicv.supabase.co | head -n 1
+
+          echo "Pinging Supabase Project 4..."
+          curl -s --head https://ziikbioeavgapnjumpju.supabase.co | head -n 1
+
+# Clipboard, Fragezeichen, Bibo, Traum
