@@ -3,7 +3,7 @@ name: Generate Article Index
 on:
   push:
     paths:
-      - '**'
+      - 'public/**'
   workflow_dispatch:
 
 jobs:
@@ -16,29 +16,45 @@ jobs:
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y curl jq
 
-      - name: Generate articles.json with title + date
+      - name: Generate articles.json with title + date (+preview for latest 3)
         run: |
-          for f in public/*.html; do
+          # Supabase Service Key aus Secrets holen
+          SERVICE_KEY="${{ secrets.SUPABASE_SERVICE_KEY }}"
+          SUPABASE_URL="https://ngtujvgsbymtxphwncuj.supabase.co"
+
+          files=($(ls -t public/*.html)) # sortiert nach Änderungszeit, neueste zuerst
+
+          echo "[" > articles.json
+          idx=0
+          for f in "${files[@]}"; do
             base=$(basename "$f" .html)
             json_file="${base}.json"
 
-            data=$(curl -s \
-              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
-              "https://ngtujvgsbymtxphwncuj.supabase.co/storage/v1/object/articles/${json_file}")
+            # JSON von Supabase laden
+            data=$(curl -s -H "Authorization: Bearer $SERVICE_KEY" \
+              "$SUPABASE_URL/storage/v1/object/articles/${json_file}")
 
             title=$(echo "$data" | jq -r '.title // empty')
             date=$(echo "$data" | jq -r '.uploaded_at // empty')
 
             if [ -n "$title" ] && [ -n "$date" ]; then
-              jq -nc --arg t "$title" --arg d "$date" '{title:$t, date:$d}'
+              if [ $idx -lt 3 ]; then
+                preview=$(echo "$data" | jq -r '.preview // empty')
+                echo "  {\"title\": \"$title\", \"date\": \"$date\", \"preview\": \"$preview\"}," >> articles.json
+              else
+                echo "  {\"title\": \"$title\", \"date\": \"$date\"}," >> articles.json
+              fi
+              idx=$((idx+1))
             fi
-          done | jq -s -c '.' > articles.json
+          done
+          # letztes Komma entfernen
+          sed -i '$ s/,$//' articles.json
+          echo "]" >> articles.json
 
       - name: Commit and push articles.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add articles.json
-          git commit -m "Update articles.json with titles and dates" || echo "No changes"
+          git commit -m "Update articles.json with titles, dates and previews" || echo "No changes"
           git push
-
