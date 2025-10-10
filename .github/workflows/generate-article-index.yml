@@ -35,13 +35,15 @@ jobs:
             title=$(echo "$data" | jq -r '.title // empty')
             date=$(echo "$data" | jq -r '.uploaded_at // empty')
             preview=$(echo "$data" | jq -r '.preview // empty')
+            signature=$(echo "$data" | jq -r '.signature // empty')
 
             if [ -n "$title" ] && [ -n "$date" ]; then
               obj=$(jq -n \
                 --arg t "$title" \
                 --arg d "$date" \
                 --arg p "$preview" \
-                '{title:$t, date:$d, preview:$p}')
+                --arg s "$signature" \
+                '{title:$t, date:$d, preview:$p, signature:$s}')
               all=$(echo "$all" | jq ". + [$obj]")
             fi
           done
