@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f9f9f9;
+      color: #222;
+      max-width: 400px;
+      margin: 4rem auto;
+      padding: 2rem;
+      border-radius: 1rem;
+      background-color: white;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    h1 { text-align: center; }
+    label { font-weight: bold; }
+    input {
+      width: 100%;
+      padding: .5rem;
+      margin: .25rem 0 1rem 0;
+      border: 1px solid #ccc;
+      border-radius: .5rem;
+    }
+    button {
+      background-color: #0070f3;
+      color: white;
+      border: none;
+      padding: .6rem 1rem;
+      border-radius: .5rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0059c8;
+    }
+    #userSection { display: none; text-align: center; }
+    #loginResult { margin-top: 1rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Login</h1>
+
+  <!-- Login-Bereich -->
+  <div id="loginSection">
+    <form id="loginForm">
+      <label for="loginEmail">E-Mail-Adresse</label>
+      <input id="loginEmail" required placeholder="name@beispiel.de">
+
+      <label for="loginPassword">Passwort</label>
+      <input type="password" id="loginPassword" required placeholder="••••••••">
+
+      <button type="submit">Einloggen</button>
+    </form>
+  </div>
+
+  <!-- Benutzerbereich (sichtbar, wenn eingeloggt) -->
+  <div id="userSection">
+    <p id="userInfo"></p>
+    <button id="logoutButton">Ausloggen</button>
+  </div>
+
+  <div id="loginResult"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // --- Supabase Setup ---
+      const supabaseUrl = 'https://ngtujvgsbymtxphwncuj.supabase.co';
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0';
+      const client = supabase.createClient(supabaseUrl, supabaseKey);
+
+      // --- DOM Elemente ---
+      const loginForm = document.getElementById("loginForm");
+      const loginEmail = document.getElementById("loginEmail");
+      const loginPassword = document.getElementById("loginPassword");
+      const loginSection = document.getElementById("loginSection");
+      const userSection = document.getElementById("userSection");
+      const userInfo = document.getElementById("userInfo");
+      const logoutButton = document.getElementById("logoutButton");
+      const loginResult = document.getElementById("loginResult");
+
+      // --- UI aktualisieren ---
+      async function updateUI() {
+        const { data } = await client.auth.getUser();
+        const user = data.user;
+        if (user) {
+          loginSection.style.display = "none";
+          userSection.style.display = "block";
+          userInfo.textContent = `✅ Eingeloggt als: ${user.email}`;
+        } else {
+          loginSection.style.display = "block";
+          userSection.style.display = "none";
+          userInfo.textContent = "";
+        }
+      }
+
+      // --- Login ---
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = loginEmail.value.trim() + "@example.com";
+        const password = loginPassword.value.trim();
+
+        if (!email || !password) {
+          loginResult.textContent = "❌ Bitte E-Mail und Passwort eingeben.";
+          return;
+        }
+
+        const { data, error } = await client.auth.signInWithPassword({ email, password });
+
+        if (error) {
+          loginResult.textContent = "❌ Login fehlgeschlagen: " + error.message;
+        } else {
+          loginResult.textContent = "✅ Erfolgreich eingeloggt!";
+          loginPassword.value = "";
+          await updateUI();
+        }
+      });
+
+      // --- Logout ---
+      logoutButton.addEventListener("click", async () => {
+        await client.auth.signOut();
+        loginResult.textContent = "👋 Erfolgreich ausgeloggt.";
+        await updateUI();
+      });
+
+      // --- Initialer Status beim Laden ---
+      updateUI();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>LZ2 Artikel Test</title>
+</head>
+<body>
+<h1>Artikeltest</h1>
+
+<!-- Öffentlicher Artikel -->
+<article>
+  <h2>Öffentlicher Artikel</h2>
+  <p>Dieser Artikel ist für alle sichtbar.</p>
+</article>
+
+<!-- Geschützter Artikel -->
+<article class="lz2" id="lz2-testart"></article>
+
+<!-- Supabase SDK -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+const supabaseUrl = 'https://ngtujvgsbymtxphwncuj.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0';
+const client = supabase.createClient(supabaseUrl, supabaseKey);
+
+async function loadProtectedArticles() {
+  console.log('--- loadProtectedArticles gestartet ---');
+
+  const { data } = await client.auth.getUser();
+  const user = data?.user;
+  console.log('User-Objekt:', user);
+
+  const articles = document.querySelectorAll('article[class^="lz"]');
+  console.log('Gefundene geschützte Artikel:', articles.length);
+
+  if (!user) {
+    console.log('Kein eingeloggter User gefunden.');
+    articles.forEach(a => a.innerHTML = '<p>🚫 Bitte zuerst einloggen auf einer anderen Seite.</p>');
+    return;
+  }
+
+  // Rechte abrufen
+  const { data: userData, error: userError } = await client
+    .from('users2')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  console.log('userData aus Tabelle users2:', userData);
+  console.log('userError:', userError);
+
+  if (userError || !userData) {
+    console.log('🚫 Kein Profil gefunden für user.id:', user.id);
+    articles.forEach(a => a.innerHTML = '<p>🚫 Kein Profil gefunden.</p>');
+    return;
+  }
+
+  for (const article of articles) {
+    const articleID = article.id;
+    const articleClass = Array.from(article.classList).find(c => /^lz\d+$/.test(c));
+    if (!articleClass) continue;
+
+    console.log('Artikel:', articleID, 'Klasse:', articleClass);
+
+    const hasAccess = userData[articleClass];
+    console.log('Zugriffsrechte für diesen Artikel:', hasAccess);
+
+    if (hasAccess === true || hasAccess === 1) {
+      try {
+        const { data: fileData, error: storageError } = await client.storage
+          .from(articleClass)
+          .download(`${articleID}.json`);
+        if (storageError) throw storageError;
+
+        const text = await fileData.text();
+        const json = JSON.parse(text);
+
+        article.innerHTML = `<h2>${json.title}</h2><p>${json.content}</p>`;
+        console.log('Artikel erfolgreich geladen:', articleID);
+      } catch (err) {
+        console.error('Fehler beim Laden des Artikels:', err);
+        article.innerHTML = '<p>🚫 Fehler beim Laden des Artikels.</p>';
+      }
+    } else {
+      console.log('Kein Zugriff auf Artikel:', articleID);
+      article.innerHTML = '<p>🚫 Du hast keinen Zugriff auf diesen Artikel.</p>';
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadProtectedArticles);
+</script>
+
+</body>
+</html>
