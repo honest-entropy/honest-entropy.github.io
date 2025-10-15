@@ -18,29 +18,54 @@
 
 <!-- Supabase SDK -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const supabaseUrl = 'https://ngtujvgsbymtxphwncuj.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndHVqdmdzYnltdHhwaHduY3VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3NzE4ODAsImV4cCI6MjA3MzM0Nzg4MH0.g9Cmgrua00pJpr6T0uO5FGRIjtgU7TTnGvOw9NHVAr0';
 const client = supabase.createClient(supabaseUrl, supabaseKey);
 
+// 💡 Schritt 1: Beim Laden prüfen, ob eine Session existiert
+async function checkSession() {
+  const { data, error } = await client.auth.getSession();
+  console.log('Aktuelle Session:', data, 'Fehler:', error);
+
+  if (error || !data?.session) {
+    console.warn('⚠️ Keine gültige Session gefunden – vermutlich abgelaufen oder nie erstellt.');
+    document.querySelectorAll('article[class^="lz"]').forEach(a => {
+      a.innerHTML = '<p>🚫 Bitte zuerst einloggen.</p>';
+    });
+    return null;
+  }
+
+  return data.session;
+}
+
+// 💡 Schritt 2: Reagiere auf Änderungen (Login, Logout, Token-Refresh)
+client.auth.onAuthStateChange((event, session) => {
+  console.log('🔄 Auth Event:', event);
+  if (event === 'TOKEN_REFRESHED') {
+    console.log('✅ Token wurde automatisch erneuert.');
+  }
+  if (event === 'SIGNED_OUT') {
+    console.warn('🚫 User wurde ausgeloggt.');
+  }
+  if (event === 'SIGNED_IN') {
+    console.log('✅ User hat sich neu eingeloggt.');
+  }
+});
+
+// 💡 Schritt 3: Hauptfunktion zum Artikel-Laden
 async function loadProtectedArticles() {
   console.log('--- loadProtectedArticles gestartet ---');
 
-  const { data } = await client.auth.getUser();
-  const user = data?.user;
-  console.log('User-Objekt:', user);
+  // Session prüfen
+  const session = await checkSession();
+  if (!session) return;
 
-  const articles = document.querySelectorAll('article[class^="lz"]');
-  console.log('Gefundene geschützte Artikel:', articles.length);
+  const user = session.user;
+  console.log('Eingeloggter User:', user);
 
-  if (!user) {
-    console.log('Kein eingeloggter User gefunden.');
-    articles.forEach(a => a.innerHTML = '<p>🚫 Bitte zuerst einloggen auf einer anderen Seite.</p>');
-    return;
-  }
-
-  // Rechte abrufen
+  // Rechte aus Tabelle users2 laden
   const { data: userData, error: userError } = await client
     .from('users2')
     .select('*')
@@ -51,20 +76,20 @@ async function loadProtectedArticles() {
   console.log('userError:', userError);
 
   if (userError || !userData) {
-    console.log('🚫 Kein Profil gefunden für user.id:', user.id);
-    articles.forEach(a => a.innerHTML = '<p>🚫 Kein Profil gefunden.</p>');
+    console.warn('🚫 Kein Profil gefunden.');
+    document.querySelectorAll('article[class^="lz"]').forEach(a =>
+      a.innerHTML = '<p>🚫 Kein Profil gefunden.</p>'
+    );
     return;
   }
 
+  // Artikel laden
+  const articles = document.querySelectorAll('article[class^="lz"]');
   for (const article of articles) {
-    const articleID = article.id;
     const articleClass = Array.from(article.classList).find(c => /^lz\d+$/.test(c));
-    if (!articleClass) continue;
-
-    console.log('Artikel:', articleID, 'Klasse:', articleClass);
-
+    const articleID = article.id;
     const hasAccess = userData[articleClass];
-    console.log('Zugriffsrechte für diesen Artikel:', hasAccess);
+    console.log('Artikel:', articleID, '→ Zugriff:', hasAccess);
 
     if (hasAccess === true || hasAccess === 1) {
       try {
@@ -75,20 +100,19 @@ async function loadProtectedArticles() {
 
         const text = await fileData.text();
         const json = JSON.parse(text);
-
         article.innerHTML = `<h2>${json.title}</h2><p>${json.content}</p>`;
-        console.log('Artikel erfolgreich geladen:', articleID);
+        console.log('✅ Artikel geladen:', articleID);
       } catch (err) {
         console.error('Fehler beim Laden des Artikels:', err);
         article.innerHTML = '<p>🚫 Fehler beim Laden des Artikels.</p>';
       }
     } else {
-      console.log('Kein Zugriff auf Artikel:', articleID);
-      article.innerHTML = '<p>🚫 Du hast keinen Zugriff auf diesen Artikel.</p>';
+      article.innerHTML = '<p>🚫 Kein Zugriff auf diesen Artikel.</p>';
     }
   }
 }
 
+// 💡 Schritt 4: Beim Laden der Seite starten
 document.addEventListener('DOMContentLoaded', loadProtectedArticles);
 </script>
 
