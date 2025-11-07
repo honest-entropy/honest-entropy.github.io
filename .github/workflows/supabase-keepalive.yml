@@ -10,18 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Supabase Projects
+      - name: Ping Supabase Projects (Keepalive)
         run: |
-          echo "Pinging Supabase Project 1..."
-          curl -s --head https://jgdbrtxptkfvxfovbsix.supabase.co | head -n 1
+          echo "=== Supabase Keepalive ==="
 
-          echo "Pinging Supabase Project 2..."
-          curl -s --head https://ngtujvgsbymtxphwncuj.supabase.co | head -n 1
+          declare -A projects=(
+            ["jgdbrtxptkfvxfovbsix"]="${{ secrets.SUPABASE_ANON_KEY_JGDBRTXPTKFVXFOVBSIX }}"
+            ["ngtujvgsbymtxphwncuj"]="${{ secrets.SUPABASE_ANON_KEY_NGTUJVGSBYMTXPHWNCUJ }}"
+            ["euuptkidjsquvhohvicv"]="${{ secrets.SUPABASE_ANON_KEY_EUUPTKIDJSQUVHOHVICV }}"
+            ["ziikbioeavgapnjumpju"]="${{ secrets.SUPABASE_ANON_KEY_ZIIKBIOEAVGAPNJUMPJU }}"
+          )
 
-          echo "Pinging Supabase Project 3..."
-          curl -s --head https://euuptkidjsquvhohvicv.supabase.co | head -n 1
+          TABLE="keepalive"
 
-          echo "Pinging Supabase Project 4..."
-          curl -s --head https://ziikbioeavgapnjumpju.supabase.co | head -n 1
-
-# Clipboard, Fragezeichen, Bibo, Traum
+          for project in "${!projects[@]}"; do
+            KEY="${projects[$project]}"
+            echo "Keeping project $project alive..."
+            curl -s "https://$project.supabase.co/rest/v1/$TABLE?select=id&limit=1" \
+              -H "apikey: $KEY" \
+              -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              && echo " → OK" || echo " → FAILED"
+          done
+          
